@@ -1,328 +1,242 @@
--<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D 인터랙티브 브로슈어</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            margin: 0;
-            overflow: hidden;
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            color: #333;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D 제주 브로슈어</title>
+<style>
+  /* 기본 배경 및 정렬 설정 */
+  body { 
+    margin: 0; 
+    overflow: hidden; 
+    background-color: #f3f4f6; 
+    font-family: sans-serif; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center; 
+    height: 100vh; 
+  }
+  
+  /* 3D 원근감을 주는 카메라 공간 */
+  .scene {
+    width: 840px; /* 280px * 3면 */
+    height: 560px;
+    perspective: 1500px;
+    position: relative;
+    cursor: grab;
+  }
+  .scene:active { cursor: grabbing; }
 
-        /* 3D Scene Setup */
-        #scene {
-            width: 100vw;
-            height: 100vh;
-            perspective: 2000px; /* 3D 원근감 */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: grab;
-        }
+  /* 브로슈어 전체 그룹 */
+  .brochure {
+    width: 280px;
+    height: 560px;
+    position: absolute;
+    top: 0;
+    left: 280px; /* 가운데 정렬을 위해 왼쪽에서 1칸 띄움 */
+    transform-style: preserve-3d;
+    transform: rotateX(-5deg) rotateY(0deg); /* 처음 약간 위에서 내려다보는 각도 */
+    transition: transform 0.1s ease-out; /* 마우스 드래그 시 부드럽게 */
+  }
 
-        #scene:active {
-            cursor: grabbing;
-        }
+  /* 각각의 패널 기본 속성 */
+  .panel {
+    width: 280px;
+    height: 560px;
+    position: absolute;
+    top: 0;
+    transform-style: preserve-3d;
+    transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 
-        /* Brochure Container */
-        #brochure {
-            position: relative;
-            width: 280px;  /* 세로로 긴 이미지에 맞게 가로 폭 조정 */
-            height: 560px; /* 세로 길이를 늘려 1:2 비율로 맞춤 */
-            transform-style: preserve-3d;
-            transform: rotateX(0deg) rotateY(0deg);
-            transition: transform 0.1s linear;
-        }
+  .panel-center {
+    left: 0;
+  }
 
-        /* Panel Common Styles */
-        .panel {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            transform-style: preserve-3d;
-            transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
-        }
+  .panel-left {
+    left: -280px;
+    transform-origin: right center; /* 오른쪽 모서리를 기준으로 회전 */
+  }
 
-        .center-panel {
-            top: 0;
-            left: 0;
-            z-index: 1;
-        }
+  .panel-right {
+    left: 280px;
+    transform-origin: left center; /* 왼쪽 모서리를 기준으로 회전 */
+  }
 
-        .left-panel {
-            top: 0;
-            left: -100%;
-            transform-origin: right center; /* 오른쪽 끝을 축으로 접힘 */
-        }
+  /* ====== 접었을 때(삼각기둥)의 애니메이션 ====== */
+  /* 바깥으로 120도씩 꺾여서 3면이 맞물림 */
+  .brochure.is-folded .panel-left {
+    transform: rotateY(-120deg);
+  }
+  
+  .brochure.is-folded .panel-right {
+    transform: rotateY(120deg);
+  }
 
-        .right-panel {
-            top: 0;
-            left: 100%;
-            transform-origin: left center; /* 왼쪽 끝을 축으로 접힘 */
-        }
+  /* 패널의 앞면/뒷면 속성 */
+  .face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden; /* 뒷면은 투과되어 보이지 않게 처리 */
+    box-sizing: border-box;
+    border: 1px solid rgba(0,0,0,0.1);
+  }
 
-        /* Folded States */
-        /* 안쪽 내용이 바깥을 향하도록 뒤로 120도씩 접혀 삼각형(삼각기둥) 모양을 만듭니다. */
-        .is-folded .right-panel {
-            transform: rotateY(120deg);
-        }
-        
-        .is-folded .left-panel {
-            transform: rotateY(-120deg);
-        }
+  /* 이미지 (바깥쪽 면) */
+  .face.front {
+    background-size: 100% 100%; /* 이미지가 잘리지 않고 꽉 차게 */
+    background-repeat: no-repeat;
+    background-position: center;
+  }
 
-        /* Brochure Faces (앞면/뒷면) */
-        .face {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            backface-visibility: hidden;
-            background-color: #ffffff;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            border-left: 1px solid rgba(0,0,0,0.05);
-            border-right: 1px solid rgba(0,0,0,0.05);
-        }
+  /* 딥그린 (안쪽 면) */
+  .face.back {
+    background-color: #064e3b; /* 요청하신 딥그린 색상 */
+    transform: rotateY(180deg); /* 뒷면이므로 뒤집어둠 */
+  }
 
-        /* 바깥쪽 면 (이미지가 들어갈 면) */
-        .face.front {
-            background-color: #ffffff; 
-        }
+  /* ====== 각 면에 이미지 파일 지정 ====== */
+  .panel-left .face.front { background-image: url('최종1.png'); }
+  .panel-center .face.front { background-image: url('최종2.png'); }
+  .panel-right .face.front { background-image: url('최종3.png'); }
 
-        /* 안쪽 면 (딥그린, 내용 없음) */
-        .face.back {
-            transform: rotateY(180deg);
-            background-color: #064e3b;
-        }
+  /* 하단 버튼 스타일 */
+  .controls {
+    margin-top: 40px;
+    display: flex;
+    gap: 16px;
+    z-index: 10;
+  }
 
-        /* Shadows for realistic depth */
-        .face::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(to right, rgba(0,0,0,0.1), transparent, rgba(0,0,0,0.05));
-            pointer-events: none;
-        }
-
-        /* UI Controls */
-        #controls {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 50;
-            display: flex;
-            gap: 15px;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            padding: 15px 25px;
-            border-radius: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-
-        button {
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        .btn-active {
-            background: #3b82f6;
-            color: white;
-            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
-        }
-
-        .btn-inactive {
-            background: rgba(255, 255, 255, 0.8);
-            color: #333;
-        }
-
-        .btn-inactive:hover {
-            background: #ffffff;
-        }
-
-        /* Responsive adjustments */
-        @media (max-width: 1024px) {
-            #brochure { transform: scale(0.8); }
-        }
-        @media (max-width: 768px) {
-            #brochure { transform: scale(0.6); }
-        }
-        @media (max-width: 480px) {
-            #brochure { transform: scale(0.45); }
-        }
-    </style>
+  button {
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+    background-color: #2563eb;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: background-color 0.2s;
+  }
+  button:hover { background-color: #1d4ed8; }
+</style>
 </head>
 <body>
 
-    <!-- UI Controls -->
-    <div id="controls">
-        <button id="btn-unfold" class="btn-active" onclick="setFoldState(false)">펼치기</button>
-        <button id="btn-fold" class="btn-inactive" onclick="setFoldState(true)">접기</button>
-        <button id="btn-auto" class="btn-inactive" onclick="toggleAutoRotate()">자동 회전: 끄기</button>
+<!-- 3D 렌더링 영역 -->
+<div class="scene" id="scene">
+  <div class="brochure" id="brochure">
+    <!-- 왼쪽 표지 (최종1.png) -->
+    <div class="panel panel-left">
+      <div class="face front"></div>
+      <div class="face back"></div>
     </div>
-
-    <!-- 3D Scene -->
-    <div id="scene">
-        <div id="brochure">
-            
-            <!-- 왼쪽 패널 -->
-            <div class="panel left-panel">
-                <!-- 바깥쪽 면 (최종1 이미지) -->
-                <div class="face front" style="background-image: url('최종1.png'); background-size: 100% 100%; background-position: center;">
-                </div>
-                <!-- 안쪽 면 (딥그린, 빈 화면) -->
-                <div class="face back">
-                </div>
-            </div>
-
-            <!-- 중앙 패널 -->
-            <div class="panel center-panel">
-                <!-- 바깥쪽 면 (최종2 이미지) -->
-                <div class="face front" style="background-image: url('최종2.png'); background-size: 100% 100%; background-position: center;">
-                </div>
-                <!-- 안쪽 면 (딥그린, 빈 화면) -->
-                <div class="face back">
-                </div>
-            </div>
-
-            <!-- 오른쪽 패널 -->
-            <div class="panel right-panel">
-                <!-- 바깥쪽 면 (최종3 이미지) -->
-                <div class="face front" style="background-image: url('최종3.png'); background-size: 100% 100%; background-position: center;">
-                </div>
-                <!-- 안쪽 면 (딥그린, 빈 화면) -->
-                <div class="face back">
-                </div>
-            </div>
-
-        </div>
+    <!-- 중앙 표지 (최종2.png) -->
+    <div class="panel panel-center">
+      <div class="face front"></div>
+      <div class="face back"></div>
     </div>
+    <!-- 오른쪽 표지 (최종3.png) -->
+    <div class="panel panel-right">
+      <div class="face front"></div>
+      <div class="face back"></div>
+    </div>
+  </div>
+</div>
 
-    <script>
-        const scene = document.getElementById('scene');
-        const brochure = document.getElementById('brochure');
-        
-        // 3D 회전 상태 변수
-        let rotateX = -5;
-        let rotateY = 0;
-        let isDragging = false;
-        let previousMousePosition = { x: 0, y: 0 };
+<!-- 컨트롤 버튼 -->
+<div class="controls">
+  <button id="btn-toggle">접기 (삼각형 만들기)</button>
+  <button id="btn-auto">자동 회전 켜기</button>
+</div>
 
-        // 자동 회전 변수
-        let autoRotate = false;
-        let autoRotateSpeed = 0.3;
-        let animationFrameId;
+<script>
+  const brochure = document.getElementById('brochure');
+  const scene = document.getElementById('scene');
+  const btnToggle = document.getElementById('btn-toggle');
+  const btnAuto = document.getElementById('btn-auto');
 
-        // 드래그(마우스 및 터치) 이벤트 리스너 설정
-        scene.addEventListener('mousedown', startDrag);
-        scene.addEventListener('mousemove', drag);
-        window.addEventListener('mouseup', endDrag);
+  let isFolded = false;
+  let isAutoRotating = false;
+  let rotationY = 0;
+  let rotationX = -5;
+  let animationFrameId;
 
-        scene.addEventListener('touchstart', (e) => startDrag(e.touches[0]));
-        scene.addEventListener('touchmove', (e) => drag(e.touches[0]));
-        window.addEventListener('touchend', endDrag);
+  // 접기 / 펼치기 버튼 이벤트
+  btnToggle.addEventListener('click', () => {
+    isFolded = !isFolded;
+    if (isFolded) {
+      brochure.classList.add('is-folded');
+      btnToggle.textContent = '펼치기';
+    } else {
+      brochure.classList.remove('is-folded');
+      btnToggle.textContent = '접기 (삼각형 만들기)';
+    }
+  });
 
-        function startDrag(e) {
-            isDragging = true;
-            previousMousePosition = { x: e.clientX, y: e.clientY };
-            if(autoRotate) toggleAutoRotate(); // 드래그 시 자동 회전 중지
-        }
+  // 마우스 드래그로 360도 돌려보기 기능
+  let isDragging = false;
+  let startX, startY;
 
-        function drag(e) {
-            if (!isDragging) return;
-            
-            const deltaMove = {
-                x: e.clientX - previousMousePosition.x,
-                y: e.clientY - previousMousePosition.y
-            };
+  scene.addEventListener('mousedown', (e) => {
+    if(isAutoRotating) return;
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+  });
 
-            rotateY += deltaMove.x * 0.5;
-            rotateX -= deltaMove.y * 0.5;
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    
+    rotationY += dx * 0.5; // 좌우 회전 속도
+    rotationX -= dy * 0.5; // 상하 회전 속도
+    
+    // 위아래로 너무 많이 뒤집히지 않게 각도 제한 (-60도 ~ 60도)
+    rotationX = Math.max(-60, Math.min(60, rotationX));
 
-            // X축 회전 제한 (위아래로 너무 많이 뒤집히지 않도록)
-            rotateX = Math.max(-40, Math.min(40, rotateX));
+    brochure.style.transform = `rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
+    
+    startX = e.clientX;
+    startY = e.clientY;
+  });
 
-            updateTransform();
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+  
+  // 마우스가 화면 밖으로 나갔을 때 드래그 풀림 처리
+  window.addEventListener('mouseleave', () => {
+    isDragging = false;
+  });
 
-            previousMousePosition = { x: e.clientX, y: e.clientY };
-        }
+  // 자동 회전 애니메이션
+  function autoRotate() {
+    if(isAutoRotating) {
+      rotationY += 0.4; // 회전 속도
+      brochure.style.transform = `rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
+      animationFrameId = requestAnimationFrame(autoRotate);
+    }
+  }
 
-        function endDrag() {
-            isDragging = false;
-        }
-
-        function updateTransform() {
-            brochure.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-        }
-
-        // 브로슈어 접기/펼치기 제어
-        function setFoldState(fold) {
-            const btnUnfold = document.getElementById('btn-unfold');
-            const btnFold = document.getElementById('btn-fold');
-
-            if (fold) {
-                brochure.classList.add('is-folded');
-                btnFold.className = 'btn-active';
-                btnUnfold.className = 'btn-inactive';
-                
-                // 삼각형 입체감이 한눈에 잘 보이도록 앵글 자동 보정
-                rotateX = -15;
-                rotateY = -45;
-            } else {
-                brochure.classList.remove('is-folded');
-                btnUnfold.className = 'btn-active';
-                btnFold.className = 'btn-inactive';
-                
-                // 펼칠 때 3면이 잘 보이도록 앵글 자동 보정
-                rotateX = -5;
-                rotateY = -15; 
-            }
-            updateTransform();
-        }
-
-        // 자동 회전 토글
-        function toggleAutoRotate() {
-            autoRotate = !autoRotate;
-            const btnAuto = document.getElementById('btn-auto');
-            
-            if (autoRotate) {
-                btnAuto.className = 'btn-active';
-                btnAuto.innerText = '자동 회전: 켜짐';
-                loopAutoRotate();
-            } else {
-                btnAuto.className = 'btn-inactive';
-                btnAuto.innerText = '자동 회전: 끄기';
-                cancelAnimationFrame(animationFrameId);
-            }
-        }
-
-        function loopAutoRotate() {
-            if (!autoRotate) return;
-            rotateY += autoRotateSpeed;
-            updateTransform();
-            animationFrameId = requestAnimationFrame(loopAutoRotate);
-        }
-
-        // 초기 시작 앵글 설정
-        updateTransform();
-        
-        // 페이지 로드 시 약간의 애니메이션 효과로 등장
-        setTimeout(() => {
-            rotateY = -15;
-            updateTransform();
-        }, 500);
-
-    </script>
+  // 자동 회전 버튼 이벤트
+  btnAuto.addEventListener('click', () => {
+    isAutoRotating = !isAutoRotating;
+    if(isAutoRotating) {
+      btnAuto.textContent = '자동 회전 끄기';
+      btnAuto.style.backgroundColor = '#059669'; // 켜졌을 때 초록색
+      autoRotate();
+    } else {
+      btnAuto.textContent = '자동 회전 켜기';
+      btnAuto.style.backgroundColor = '#2563eb'; // 꺼졌을 때 파란색
+      cancelAnimationFrame(animationFrameId);
+    }
+  });
+</script>
 </body>
 </html>
